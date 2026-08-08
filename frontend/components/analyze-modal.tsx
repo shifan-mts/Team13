@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Terminal, CheckCircle2, Loader2, Play, ShieldAlert } from "lucide-react";
+import { X, ShieldAlert, CheckCircle2, Loader2, Play, Terminal } from "lucide-react";
 
 interface AnalyzeModalProps {
   isOpen: boolean;
@@ -9,146 +9,171 @@ interface AnalyzeModalProps {
   onComplete: () => void;
 }
 
-const STEPS = [
-  { id: 1, text: "Scanning asset inventory & loading CVE records...", delay: 600 },
-  { id: 2, text: "Enriching threat intelligence (CISA KEV catalog, EPSS 2.0 probabilities)...", delay: 900 },
-  { id: 3, text: "Evaluating internet exposure & network perimeter access controls...", delay: 800 },
-  { id: 4, text: "Running deterministic Risk Scoring Engine (Weighted 6-Factor matrix)...", delay: 1000 },
-  { id: 5, text: "Generating explainable priority roadmap & AI remediation advice...", delay: 700 },
-];
-
 export function AnalyzeModal({ isOpen, onClose, onComplete }: AnalyzeModalProps) {
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+
+  const steps = [
+    { title: "Querying Infrastructure Inventory", desc: "Discovering active assets across production, staging, and internal subnets." },
+    { title: "CISA KEV Catalog Synchronization", desc: "Fetching latest exploited vulnerability feed from CISA Known Exploited Vulnerabilities catalog." },
+    { title: "EPSS 2.0 Exploit Probability Calculation", desc: "Mapping FIRST EPSS 30-day exploit probability vectors." },
+    { title: "Environmental Exposure & Criticality Mapping", desc: "Evaluating network perimeter boundaries, open ports, and business impact tiers." },
+    { title: "Executing Risk Scoring Engine", desc: "Computing deterministic 6-factor composite scores and generating priority tiers." },
+  ];
 
   useEffect(() => {
     if (!isOpen) {
-      setCurrentStepIndex(0);
-      setLogs([]);
+      setCurrentStep(0);
+      setIsRunning(false);
       setIsFinished(false);
-      return;
+      setLogs([]);
     }
+  }, [isOpen]);
 
-    let isMounted = true;
-    let step = 0;
+  const handleStartScan = () => {
+    setIsRunning(true);
+    setCurrentStep(0);
+    setLogs(["[00:00.1] Initializing PatchPilot Security Telemetry Scanner v1.0..."]);
 
-    const runStep = () => {
-      if (step < STEPS.length) {
-        const stepData = STEPS[step];
-        if (isMounted) {
-          setCurrentStepIndex(step);
-          setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${stepData.text}`]);
-        }
-        step++;
-        setTimeout(runStep, stepData.delay);
+    const runNextStep = (stepIdx: number) => {
+      if (stepIdx < steps.length) {
+        setCurrentStep(stepIdx);
+        setLogs((prev) => [
+          ...prev,
+          `[00:0${stepIdx + 1}.2] ${steps[stepIdx].title}...`,
+        ]);
+        setTimeout(() => {
+          runNextStep(stepIdx + 1);
+        }, 1000);
       } else {
-        if (isMounted) {
-          setIsFinished(true);
-          setLogs((prev) => [
-            ...prev,
-            `[${new Date().toLocaleTimeString()}] SUCCESS: Analysis complete! 18 CVEs prioritized into PATCH NOW, NEXT, and LATER.`,
-          ]);
-        }
+        setIsRunning(false);
+        setIsFinished(true);
+        setLogs((prev) => [
+          ...prev,
+          "[00:06.0] Analysis complete! Evaluated 18 CVEs across 12 infrastructure assets.",
+        ]);
+        onComplete();
       }
     };
 
-    runStep();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen]);
+    setTimeout(() => {
+      runNextStep(0);
+    }, 600);
+  };
 
   if (!isOpen) return null;
 
-  const progressPercent = Math.min(100, Math.round(((currentStepIndex + (isFinished ? 1 : 0)) / STEPS.length) * 100));
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-2xl glass-panel rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-xl bg-[#0b0f17] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        {/* Modal Header */}
+        <div className="glass-panel border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-[#0b0f17]">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
-              <Terminal className="h-5 w-5 text-cyan-400" />
+            <div className="h-8 w-8 rounded-lg bg-cyan-950 border border-cyan-800/60 flex items-center justify-center text-cyan-400">
+              <ShieldAlert className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="font-semibold text-white text-base">Environment Threat Analysis</h3>
-              <p className="text-xs text-slate-400">PatchPilot Risk Engine — Real-World Prioritization</p>
+              <h2 className="text-sm font-bold text-white">Environment Threat Analysis</h2>
+              <p className="text-[11px] text-slate-400">Rescan telemetry & re-evaluate risk roadmap</p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Progress Bar */}
-        <div className="px-6 pt-6">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-            <span>Analysis Progress</span>
-            <span className="text-cyan-400 font-mono font-semibold">{progressPercent}%</span>
-          </div>
-          <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden p-0.5">
-            <div
-              className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-300 shadow-sm shadow-cyan-500/50"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Live Logs Terminal Window */}
-        <div className="p-6">
-          <div className="h-56 bg-slate-950/90 rounded-xl p-4 font-mono text-xs border border-slate-800/80 overflow-y-auto flex flex-col gap-2">
-            {logs.map((log, index) => (
-              <div
-                key={index}
-                className={`flex items-start gap-2 ${
-                  index === logs.length - 1 && !isFinished
-                    ? "text-cyan-400 font-semibold"
-                    : index === logs.length - 1 && isFinished
-                    ? "text-emerald-400 font-semibold"
-                    : "text-slate-400"
-                }`}
+        {/* Modal Content Body */}
+        <div className="p-6 space-y-5">
+          {!isRunning && !isFinished && (
+            <div className="glass-panel p-4 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-3">
+              <p>
+                Triggering an environment scan will query active infrastructure assets, pull real-time CISA KEV catalog signals, and execute the pure 6-factor risk scoring engine.
+              </p>
+              <button
+                onClick={handleStartScan}
+                className="w-full py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition-all shadow-md shadow-cyan-600/20 flex items-center justify-center gap-2"
               >
-                {index === logs.length - 1 && !isFinished ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-400 shrink-0 mt-0.5" />
-                ) : (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                )}
-                <span>{log}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+                <Play className="h-4 w-4 fill-white" />
+                <span>Begin Infrastructure Scan</span>
+              </button>
+            </div>
+          )}
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/40 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <ShieldAlert className="h-4 w-4 text-cyan-400" />
-            <span>Deterministic Scoring • CISA KEV + EPSS 2.0</span>
-          </div>
-          {isFinished ? (
-            <button
-              onClick={() => {
-                onComplete();
-                onClose();
-              }}
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-semibold shadow-lg shadow-emerald-500/20 transition-all"
-            >
-              View Updated Priority Roadmap
-            </button>
-          ) : (
-            <button
-              disabled
-              className="px-5 py-2 rounded-xl bg-slate-800 text-slate-500 text-xs font-semibold flex items-center gap-2 cursor-not-allowed"
-            >
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Analyzing...</span>
-            </button>
+          {(isRunning || isFinished) && (
+            <div className="space-y-4">
+              {/* Progress Steps */}
+              <div className="space-y-2">
+                {steps.map((step, idx) => {
+                  const isDone = idx < currentStep || isFinished;
+                  const isCurrent = idx === currentStep && isRunning;
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-lg border text-xs transition-all flex items-start gap-3 ${
+                        isCurrent
+                          ? "bg-slate-900 border-cyan-500/50 text-white"
+                          : isDone
+                          ? "bg-slate-950/60 border-slate-800 text-slate-300"
+                          : "bg-slate-950/30 border-slate-900 text-slate-600"
+                      }`}
+                    >
+                      <div className="mt-0.5 shrink-0">
+                        {isDone ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                        ) : isCurrent ? (
+                          <Loader2 className="h-4 w-4 text-cyan-400 animate-spin" />
+                        ) : (
+                          <div className="h-4 w-4 rounded-full border border-slate-700 flex items-center justify-center text-[10px] text-slate-500 font-mono">
+                            {idx + 1}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-semibold">{step.title}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{step.desc}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Console Telemetry Box */}
+              <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950 font-mono text-[11px] space-y-1 max-h-36 overflow-y-auto">
+                <div className="flex items-center gap-2 text-slate-400 font-semibold mb-2 text-[10px] uppercase tracking-wider">
+                  <Terminal className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Scan Telemetry Stream</span>
+                </div>
+                {logs.map((log, index) => (
+                  <div
+                    key={index}
+                    className={`flex items-start gap-2 ${
+                      index === logs.length - 1 && !isFinished
+                        ? "text-cyan-400 font-semibold"
+                        : index === logs.length - 1 && isFinished
+                        ? "text-emerald-400 font-semibold"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    <span>{log}</span>
+                  </div>
+                ))}
+              </div>
+
+              {isFinished && (
+                <button
+                  onClick={onClose}
+                  className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors"
+                >
+                  Close & View Updated Dashboard
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
