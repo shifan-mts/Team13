@@ -175,12 +175,11 @@ function contradictsEngine(text: string, result: RiskResult): boolean {
  * Explain a RiskResult using a local Ollama model, falling back to the
  * deterministic templates on any failure. Never throws.
  */
-export async function generateLocalExplanation(
-  result: RiskResult,
-  options: LocalModelOptions = {}
-): Promise<ExplanationOutput> {
-  const fallback = generateAiExplanation(result);
-
+async function requestOllamaJson(
+  systemPrompt: string,
+  userPrompt: string,
+  options: LocalModelOptions
+): Promise<unknown | null> {
   const baseUrl =
     options.baseUrl ?? readEnv("OLLAMA_BASE_URL") ?? DEFAULT_BASE_URL;
   const model = options.model ?? readEnv("OLLAMA_MODEL") ?? DEFAULT_MODEL;
@@ -200,19 +199,38 @@ export async function generateLocalExplanation(
         format: "json",
         options: { temperature: 0.2 },
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: buildUserPrompt(result) },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
       }),
     });
 
-    if (!response.ok) return fallback;
+    if (!response.ok) return null;
 
     const body: unknown = await response.json();
     const content = (body as { message?: { content?: unknown } })?.message?.content;
-    if (typeof content !== "string" || content.trim().length === 0) return fallback;
+    if (typeof content !== "string" || content.trim().length === 0) return null;
 
-    const parsed: unknown = JSON.parse(content);
+    return JSON.parse(content) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateLocalExplanation(
+  result: RiskResult,
+  options: LocalModelOptions = {}
+): Promise<ExplanationOutput> {
+  const fallback = generateAiExplanation(result);
+
+  try {
+    const parsed = await requestOllamaJson(
+      SYSTEM_PROMPT,
+      buildUserPrompt(result),
+      options
+    );
+    if (parsed === null) return fallback;
+
     const summary = (parsed as { summary?: unknown })?.summary;
     const recommendation = (parsed as { recommendation?: unknown })?.recommendation;
     const whyPrioritized = asStringArray(
@@ -244,4 +262,85 @@ export async function generateLocalExplanation(
   } catch {
     return fallback;
   }
+}
+
+const COMPARE_SYSTEM_PROMPT = `You are PatchPilot AI, a vulnerability prioritization assistant.
+
+A deterministic security risk engine has ALREADY decided which of the two
+vulnerabilities is higher priority. That decision is final.
+
+You MUST NOT recalculate, change, or contradict the scores or priorities.
+Use ONLY the supplied evidence. Do not invent CVE facts.
+
+Explain in two or three sentences why the higher-risk CVE outranks the other,
+even when its CVSS score is lower.
+
+Reply with JSON only: {"comparisonSummary": string}`;
+
+function buildComparePrompt(higher: RiskResult, lower: RiskResult): string {
+  const describe = (r: RiskResult, label: string) =>
+    [
+      `${label}: ${r.vulnerability.cve}`,
+      `  CVSS ${r.vulnerability.cvss}, EPSS ${(r.vulnerability.epss * 100).toFixed(1)}%`,
+      `  KEV: ${r.vulnerability.kev ? "yes" : "no"}, public exploit: ${r.vulnerability.exploitAvailable ? "yes" : "no"}`,
+      `  Internet exposed: ${r.vulnerability.internetExposed ? "yes" : "no"}`,
+      `  Asset: ${r.vulnerability.assetName} (${r.vulnerability.businessImpact} impact, ${r.vulnerability.environment})`,
+      `  Risk score (final): ${r.score}/100 — ${r.priority}`,
+    ].join("\n");
+
+  return [
+    describe(higher, "HIGHER PRIORITY (decided by the engine)"),
+    "",
+    describe(lower, "LOWER PRIORITY"),
+  ].join("\n");
+}
+
+export interface ComparisonOutput {
+  higherRiskCve: string;
+  comparisonSummary: string;
+  provider: "local" | "fallback";
+}
+
+/**
+ * Compares two scored vulnerabilities. The engine picks the winner; the model
+ * only phrases the rationale, and is discarded if it names the wrong CVE or
+ * restates a different score.
+ */
+export async function generateLocalComparison(
+  resA: RiskResult,
+  resB: RiskResult,
+  options: LocalModelOptions = {}
+): Promise<ComparisonOutput> {
+  const higher = resA.score >= resB.score ? resA : resB;
+  const lower = resA.score >= resB.score ? resB : resA;
+
+  const deterministic: ComparisonOutput = {
+    higherRiskCve: higher.vulnerability.cve,
+    comparisonSummary: generateAiComparison(resA, resB),
+    provider: "fallback",
+  };
+
+  const parsed = await requestOllamaJson(
+    COMPARE_SYSTEM_PROMPT,
+    buildComparePrompt(higher, lower),
+    options
+  );
+  if (parsed === null) return deterministic;
+
+  const summary = (parsed as { comparisonSummary?: unknown })?.comparisonSummary;
+  if (typeof summary !== "string" || summary.trim().length === 0) return deterministic;
+
+  // The model must not flip the engine's decision or restate other numbers.
+  if (
+    contradictsEngine(summary, higher) ||
+    summary.toUpperCase().includes(lower.vulnerability.cve.toUpperCase() + " SHOULD BE PATCHED FIRST")
+  ) {
+    return deterministic;
+  }
+
+  return {
+    higherRiskCve: higher.vulnerability.cve,
+    comparisonSummary: summary.trim(),
+    provider: "local",
+  };
 }

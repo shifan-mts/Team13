@@ -79,6 +79,12 @@ $$\text{Risk Score} = \text{Math.round}\left(\sum_{i=1}^{6} \text{Score}_i \time
 
 ## 4. Backend REST API Specification
 
+> **Status update:** these endpoints are now **implemented as Next.js route handlers**
+> under `frontend/app/api/` — a separate FastAPI service is no longer required for the
+> MVP. The live response shapes are documented in the [project README](README.md#api);
+> where they differ from the drafts below, the README is authoritative. The Pydantic
+> schemas in §5 remain useful if the backend is later split out.
+
 When developing the FastAPI / Node.js backend, implement the following standard REST endpoints:
 
 ### 1. `GET /api/vulnerabilities`

@@ -1,9 +1,14 @@
 # PatchPilot AI — Architecture
 
-> **Status: partially implemented.** The frontend and the risk engine are **built** and
-> live under [`frontend/`](../frontend) — see the paths in §6. The backend, live
-> intelligence feeds, and the real LLM layer are **not** built; for those, this document
-> is still a forward-looking design.
+> **Status: implemented.** The MVP is built and lives under [`frontend/`](../frontend) —
+> see the paths in §6. That includes the dashboard, the risk engine, five API route
+> handlers under `frontend/app/api/`, an optional local LLM explanation layer (Ollama),
+> and live CISA KEV / EPSS / NVD enrichment in `frontend/lib/intelligence/` that
+> normalizes into the existing `Vulnerability` type. The [project README](../README.md)
+> describes the current shape.
+>
+> Still forward-looking: a standalone backend service, persistence, and the Phase 3–5
+> features in [`overview.md`](overview.md) §21.
 >
 > It is derived from [`overview.md`](overview.md) (§9–§13, §20). Items marked **PROPOSED**
 > were open decisions at authoring time; where code now exists,
