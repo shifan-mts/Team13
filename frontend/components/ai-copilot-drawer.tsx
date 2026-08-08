@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { RiskResult } from "@/types/vulnerability";
 import { generateAiComparison } from "@/lib/ai-explainer";
+import { apiUrl } from "@/lib/api-base";
 import { X, Sparkles, ArrowRight, Bot, ShieldCheck, Terminal, HelpCircle, Loader2, Wand2 } from "lucide-react";
 
 interface AiCopilotDrawerProps {
@@ -56,7 +57,7 @@ export function AiCopilotDrawer({ isOpen, onClose, results }: AiCopilotDrawerPro
 
     setLoading(true);
     try {
-      const response = await fetch("/api/ai/compare", {
+      const response = await fetch(apiUrl("/api/ai/compare"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cveIdA: selectedCveA, cveIdB: selectedCveB }),

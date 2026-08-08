@@ -6,8 +6,6 @@
  * convenience but never trusted — otherwise the browser could dictate scores.
  */
 
-import { NextResponse } from "next/server";
-
 import { calculateRisk } from "@/lib/risk-engine";
 import { getVulnerabilities } from "@/lib/vulnerabilities";
 import type { RiskResult, Vulnerability } from "@/types/vulnerability";
@@ -79,13 +77,5 @@ export function resolveRisk(input: unknown): RiskResult | null {
 }
 
 export function jsonError(message: string, status = 400) {
-  return NextResponse.json({ success: false, error: message }, { status });
-}
-
-/** Route handlers must never leak a stack trace to the client. */
-export function safeHandler<T>(
-  handler: () => Promise<T>,
-  fallbackMessage: string
-): Promise<T | ReturnType<typeof jsonError>> {
-  return handler().catch(() => jsonError(fallbackMessage, 500));
+  return Response.json({ success: false, error: message }, { status });
 }

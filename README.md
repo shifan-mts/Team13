@@ -50,6 +50,10 @@ explanation is used instead.
 ### Layout
 
 ```text
+backend/                               standalone API service (optional)
+├── src/server.ts                      Express app — same 5 endpoints
+└── tsconfig.json                      @/* -> ../frontend/*  (shared engine)
+
 frontend/
 ├── app/
 │   ├── page.tsx                      dashboard (Kanban + table)
@@ -132,6 +136,17 @@ enrichment is opt-in via `?live=true`.
 A client-supplied `risk` is always ignored — the server recomputes it, so the browser can
 never dictate a score.
 
+**Two ways to serve these.** Both expose identical endpoints and share the same engine:
+
+| | Where | When to use |
+|---|---|---|
+| **Built-in** (default) | `frontend/app/api/` | One process. Nothing to configure. |
+| **Standalone** | `backend/` on port 8000 | Separate service; set `NEXT_PUBLIC_API_URL` |
+
+The standalone service imports `frontend/lib/risk-engine.ts` through a path alias rather
+than copying it — there is exactly one risk engine in this repository, so the two surfaces
+cannot drift apart. See [`backend/README.md`](backend/README.md).
+
 ```bash
 curl -s localhost:3000/api/vulnerabilities | jq '.stats'
 curl -s -X POST localhost:3000/api/ai/explain \
@@ -149,6 +164,17 @@ npm run dev
 ```
 
 Open http://localhost:3000.
+
+Optionally run the standalone API instead of the built-in routes:
+
+```bash
+cd backend && npm install && npm start      # http://localhost:8000
+```
+
+```bash
+# frontend/.env.local — then rebuild the frontend
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
 ```bash
 npm test         # 35 tests
