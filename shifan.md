@@ -73,11 +73,17 @@ $$\text{Risk Score} = \text{Math.round}\left(\sum_{i=1}^{6} \text{Score}_i \time
 - $\text{Score} < 70 \implies \text{Priority: }\mathbf{"LATER"}$ (🟡 Yellow)
 
 > [!IMPORTANT]
-> **Validation Rule**: The backend scoring module **must** preserve the property where an actively exploited, internet-facing CVE with a lower CVSS score (e.g. CVE-2024-23897, CVSS 7.5, EPSS 91.5% $\rightarrow$ Risk 91, PATCH NOW) outranks an unexploited internal CVE with a higher CVSS score (e.g. CVE-2023-22515, CVSS 10.0, EPSS 22% $\rightarrow$ Risk ~68, PATCH LATER).
+> **Validation Rule**: The backend scoring module **must** preserve the property where an actively exploited, internet-facing CVE with a lower CVSS score (e.g. CVE-2024-23897, CVSS 7.5, EPSS 91.5% $\rightarrow$ Risk 96, PATCH NOW) outranks an unexploited internal CVE with a higher CVSS score (e.g. CVE-2023-22515, CVSS 10.0, EPSS 22% $\rightarrow$ Risk 26, PATCH LATER).
 
 ---
 
 ## 4. Backend REST API Specification
+
+> **Status update:** these endpoints are now **implemented as Next.js route handlers**
+> under `frontend/app/api/` — a separate FastAPI service is no longer required for the
+> MVP. The live response shapes are documented in the [project README](README.md#api);
+> where they differ from the drafts below, the README is authoritative. The Pydantic
+> schemas in §5 remain useful if the backend is later split out.
 
 When developing the FastAPI / Node.js backend, implement the following standard REST endpoints:
 
@@ -92,11 +98,11 @@ Returns all evaluated vulnerability records sorted descending by composite risk 
   "count": 18,
   "stats": {
     "total": 18,
-    "nowCount": 7,
-    "nextCount": 6,
-    "laterCount": 5,
-    "kevCount": 14,
-    "avgRiskScore": 84
+    "nowCount": 11,
+    "nextCount": 3,
+    "laterCount": 4,
+    "kevCount": 15,
+    "avgRiskScore": 79
   },
   "data": [
     {
@@ -117,7 +123,7 @@ Returns all evaluated vulnerability records sorted descending by composite risk 
         "vendor": "ConnectWise",
         "remediationAction": "Upgrade ConnectWise ScreenConnect to version 23.9.8 or higher immediately."
       },
-      "score": 98,
+      "score": 99,
       "priority": "NOW",
       "factors": [
         {
@@ -174,7 +180,7 @@ Fetch details for a single CVE by ID or CVE string.
   "success": true,
   "data": {
     "vulnerability": { ... },
-    "score": 98,
+    "score": 99,
     "priority": "NOW",
     "factors": [ ... ]
   }
@@ -215,7 +221,7 @@ Generates AI explanation prose for a given vulnerability risk result.
 ```json
 {
   "cve": "CVE-2024-1709",
-  "score": 98,
+  "score": 99,
   "priority": "NOW"
 }
 ```
@@ -224,7 +230,7 @@ Generates AI explanation prose for a given vulnerability risk result.
 ```json
 {
   "cve": "CVE-2024-1709",
-  "summary": "CVE-2024-1709 is categorized as PATCH NOW with an urgent Risk Score of 98/100. Confirmed active exploitation in CISA KEV catalog combined with internet exposure creates immediate perimeter breach risk.",
+  "summary": "CVE-2024-1709 is categorized as PATCH NOW with an urgent Risk Score of 99/100. Confirmed active exploitation in CISA KEV catalog combined with internet exposure creates immediate perimeter breach risk.",
   "remediationAdvice": "Upgrade ConnectWise ScreenConnect to version 23.9.8 or higher immediately.",
   "remediationCommand": "sudo apt-get update && sudo apt-get install --only-upgrade connectwise-screenconnect"
 }
@@ -248,7 +254,7 @@ Compares two CVEs and returns human-auditable rationale.
 ```json
 {
   "higherRiskCve": "CVE-2024-23897",
-  "comparisonSummary": "CVE-2024-23897 (Risk 91, PATCH NOW) should be patched before CVE-2023-22515 (Risk 68, PATCH LATER) because of confirmed active exploitation and public internet exposure, despite having a lower CVSS score (7.5 vs 10.0)."
+  "comparisonSummary": "CVE-2024-23897 (Risk 96, PATCH NOW) should be patched before CVE-2023-22515 (Risk 26, PATCH LATER) because of confirmed active exploitation and public internet exposure, despite having a lower CVSS score (7.5 vs 10.0)."
 }
 ```
 

@@ -1,11 +1,19 @@
 # PatchPilot AI — Architecture
 
-> **Status: design specification.** Nothing described here is implemented yet. This
-> document defines the system the team intends to build so that all three members can
-> work in parallel against agreed contracts. It is derived from
-> [`overview.md`](overview.md) (§9–§13, §20). Where the overview leaves a decision open,
-> this document proposes an answer and marks it **PROPOSED** — those need a team call
-> before anyone writes the code.
+> **Status: implemented.** The MVP is built and lives under [`frontend/`](../frontend) —
+> see the paths in §6. That includes the dashboard, the risk engine, five API route
+> handlers under `frontend/app/api/`, an optional local LLM explanation layer (Ollama),
+> and live CISA KEV / EPSS / NVD enrichment in `frontend/lib/intelligence/` that
+> normalizes into the existing `Vulnerability` type. The [project README](../README.md)
+> describes the current shape.
+>
+> Still forward-looking: a standalone backend service, persistence, and the Phase 3–5
+> features in [`overview.md`](overview.md) §21.
+>
+> It is derived from [`overview.md`](overview.md) (§9–§13, §20). Items marked **PROPOSED**
+> were open decisions at authoring time; where code now exists,
+> [`RISK_ENGINE.md`](RISK_ENGINE.md) documents what was actually implemented and takes
+> precedence over any **PROPOSED** value here.
 
 ---
 
@@ -241,31 +249,41 @@ described in the pitch as the system "computing" in real time.
 
 ## 6. Repository Structure
 
-Per overview §11:
+**As built.** The application lives under `frontend/`, not at the repository root — the
+flat layout sketched in overview §11 applies *inside* that directory:
 
 ```text
-patchpilot/
-├── app/
-│   ├── page.tsx
-│   └── vulnerabilities/[id]/page.tsx
-├── components/
-│   ├── dashboard.tsx
-│   ├── vulnerability-table.tsx
-│   ├── risk-card.tsx
-│   ├── priority-column.tsx
-│   └── vulnerability-detail.tsx
-├── lib/
-│   ├── vulnerabilities.ts
-│   ├── risk-engine.ts
-│   └── utils.ts
-├── types/
-│   └── vulnerability.ts
-└── public/
+Team13/
+├── frontend/                    ← the Next.js application
+│   ├── app/
+│   │   ├── page.tsx
+│   │   ├── layout.tsx
+│   │   └── vulnerabilities/[id]/page.tsx
+│   ├── components/
+│   │   ├── navbar.tsx
+│   │   ├── stats-overview.tsx
+│   │   ├── priority-kanban.tsx
+│   │   ├── vulnerability-table.tsx
+│   │   ├── vulnerability-detail.tsx
+│   │   ├── analyze-modal.tsx
+│   │   └── ai-copilot-drawer.tsx
+│   ├── lib/
+│   │   ├── risk-engine.ts       ← the canonical engine
+│   │   ├── vulnerabilities.ts
+│   │   └── ai-explainer.ts
+│   ├── types/vulnerability.ts
+│   └── tests/risk-engine.test.ts
+├── docs/
+└── shifan.md
 ```
 
-Note this is a **flat top-level layout** (`app/`, `lib/`, `types/` at the root), not
-`src/`-nested. Worth confirming at scaffold time, because `create-next-app` will ask and
-the answer has to match this document.
+`frontend/tsconfig.json` maps `@/*` → `./*`, so `@/lib/risk-engine` resolves **inside
+`frontend/`**. Every module path named elsewhere in this document should be read with a
+`frontend/` prefix.
+
+> A second risk engine once existed at the repository root (`lib/risk-engine.ts`) with its
+> own tests. It produced different scores for the same input and has been removed.
+> `frontend/lib/risk-engine.ts` is the only implementation.
 
 ---
 
