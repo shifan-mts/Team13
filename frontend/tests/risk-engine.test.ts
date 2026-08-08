@@ -1,28 +1,40 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PRIORITY_THRESHOLDS,
   calculateRisk,
   getPriority,
-  type RiskInput,
+  getRiskFactors,
 } from "@/lib/risk-engine";
+import type { RiskResult, Vulnerability } from "@/types/vulnerability";
 
 /** Baseline record; each test overrides only the fields it cares about. */
-function vuln(overrides: Partial<RiskInput> = {}): RiskInput {
+function vuln(overrides: Partial<Vulnerability> = {}): Vulnerability {
   return {
+    id: "vuln-test",
     cve: "CVE-TEST-0000",
+    description: "Synthetic record for engine tests.",
     cvss: 5,
     epss: 0.05,
     kev: false,
     exploitAvailable: false,
     internetExposed: false,
+    assetName: "test-asset",
     assetCriticality: "medium",
-    businessImpact: "medium",
     environment: "development",
+    businessImpact: "medium",
     ...overrides,
   };
 }
 
-/** Overview §4 / spec §8 — the scenario the whole product rests on. */
+/** factors[] is an array of named entries; look one up by name. */
+function factor(result: RiskResult, name: string): number {
+  const match = result.factors.find((f) => f.name === name);
+  if (!match) throw new Error(`missing factor: ${name}`);
+  return match.score;
+}
+
+/** overview.md §4 — the inversion the whole product rests on. */
 const SCENARIO_A = vuln({
   cve: "CVE-DEMO-A",
   cvss: 9.8,
@@ -63,37 +75,35 @@ describe("calculateRisk", () => {
   it("scores an actively exploited, exposed vulnerability as NOW", () => {
     const result = calculateRisk(SCENARIO_B);
 
-    expect(result.score).toBeGreaterThanOrEqual(90);
+    expect(result.score).toBeGreaterThanOrEqual(PRIORITY_THRESHOLDS.NOW);
     expect(result.priority).toBe("NOW");
-    expect(result.reasons).toContain("Known exploited vulnerability");
-    expect(result.reasons).toContain("Internet-facing asset");
-    expect(result.recommendation).toMatch(/immediately/i);
+    expect(factor(result, "Exploitation Evidence")).toBe(100);
+    expect(factor(result, "Asset Exposure")).toBe(100);
   });
 
   it("scores high CVSS with no exploitation well below the exploited case", () => {
     const result = calculateRisk(SCENARIO_A);
 
-    expect(result.factors.cvss).toBe(98);
-    expect(result.score).toBeLessThan(70);
-    expect(result.reasons).not.toContain("Known exploited vulnerability");
+    expect(factor(result, "CVSS Severity")).toBe(98);
+    expect(factor(result, "Exploitation Evidence")).toBe(0);
+    expect(result.score).toBeLessThan(PRIORITY_THRESHOLDS.NEXT);
   });
 
   it("classifies a genuinely low-risk vulnerability as LATER", () => {
     const result = calculateRisk(vuln({ cvss: 3.1, epss: 0.01 }));
 
     expect(result.priority).toBe("LATER");
-    expect(result.recommendation).toMatch(/routine/i);
   });
 
   it("normalizes CVSS and EPSS onto 0-100", () => {
-    const { factors } = calculateRisk(vuln({ cvss: 8.1, epss: 0.97 }));
+    const result = calculateRisk(vuln({ cvss: 8.1, epss: 0.97 }));
 
-    expect(factors.cvss).toBeCloseTo(81);
-    expect(factors.epss).toBeCloseTo(97);
+    expect(factor(result, "CVSS Severity")).toBe(81);
+    expect(factor(result, "EPSS Exploit Probability")).toBe(97);
   });
 
   it("keeps the score an integer within 0-100 across extremes", () => {
-    const inputs: RiskInput[] = [
+    const inputs: Vulnerability[] = [
       vuln({ cvss: 0, epss: 0 }),
       vuln({ cvss: 10, epss: 1 }),
       SCENARIO_A,
@@ -120,6 +130,23 @@ describe("calculateRisk", () => {
 
   it("is deterministic for identical input", () => {
     expect(calculateRisk(SCENARIO_B)).toEqual(calculateRisk(SCENARIO_B));
+  });
+
+  it("returns the vulnerability and all six factors, weight-sorted", () => {
+    const result = calculateRisk(SCENARIO_B);
+
+    expect(result.vulnerability).toEqual(SCENARIO_B);
+    expect(result.factors).toHaveLength(6);
+
+    const weights = result.factors.map((f) => f.weight);
+    expect(weights).toEqual([...weights].sort((a, b) => b - a));
+    expect(weights.reduce((sum, w) => sum + w, 0)).toBeCloseTo(1);
+  });
+
+  it("gives every factor human-readable evidence", () => {
+    for (const f of getRiskFactors(SCENARIO_B)) {
+      expect(f.evidence.length).toBeGreaterThan(0);
+    }
   });
 });
 
